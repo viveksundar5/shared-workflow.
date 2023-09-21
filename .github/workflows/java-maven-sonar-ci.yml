@@ -1,0 +1,81 @@
+name: java-maven-sonar-ci
+
+on:
+  #workflow_dispatch:
+  workflow_call:
+    secrets:
+      Workflow2_PAT_TOKEN_GITHUB:
+        required: true
+      token:
+        required: true
+    inputs:
+      repoName:
+        type: string
+        required: true
+        description: Application
+      branchName:
+        type: string
+        required: true
+        description: Branch Name
+         
+
+env:
+  JAVA_VERSION: '17' 
+  SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+  GITHUB_TOKEN: ${{ secrets.Workflow2_PAT_TOKEN_GITHUB }}
+  REPOSITORY: ${{ inputs.repoName }}
+
+jobs:
+
+  Build:
+    name: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@v2
+        with:
+          repository: ${{ inputs.repoName }}
+          ref: release/r-${{inputs.releaseNo}}
+          token: ${{ secrets.GITHUB_TOKEN }}
+        env:
+          Workflow2_PAT_TOKEN_GITHUB: ${{ secrets.Workflow2_PAT_TOKEN_GITHUB }}
+         
+      - name: Setup Java Sdk ${{env.JAVA_VERSION}}   
+        uses: actions/setup-java@v3
+        with:
+          java-version: ${{env.JAVA_VERSION}}
+          distribution: 'temurin'
+          
+      - name: Run SonarQube Scan
+        run: |
+          echo "SONAR URL - > " ${{vars.SONAR_HOST_URL}}
+          #export SONAR_TOKEN=${{ secrets.SONAR_TOKEN }}
+          export SONAR_HOST_URL=${{vars.SONAR_HOST_URL}}
+          mvn install sonar:sonar \
+            -D sonar.projectKey=test-maven-project \
+            -D sonar.host.url=$SONAR_HOST_URL \
+            -D sonar.login=admin -D sonar.password=admin123 
+
+      - name: Cache Maven packages
+        uses: actions/cache@v3
+        with:
+          path: ~/.m2
+          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+          restore-keys: ${{ runner.os }}-m2            
+         
+      - name: Build project with Maven
+        run: mvn -B package --file pom.xml	 
+        
+      #- name: Publish package
+       # run: mvn --batch-mode deploy
+        
+        #env:
+         # GITHUB_TOKEN: ${{ secrets.Workflow2_PAT_TOKEN_GITHUB }}   
+       
+          
+      #- name: Build and analyze
+       # env:
+        #  GITHUB_TOKEN: ${{ secrets.Workflow2_PAT_TOKEN_GITHUB }}  # Needed to get PR information, if any
+         # SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          #SONAR_HOST_URL: http://3.110.119.245:9000
+       # run: mvn -B verify  sonar:sonar -Dsonar.projectKey=test-maven-project
